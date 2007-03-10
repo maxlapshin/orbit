@@ -352,3 +352,4 @@ void Init_ruby_orbit() {
 	
 	ruby_orbit2_orb = CORBA_ORB_init(&argc, argv, "orbit-local-orb", &ruby_orbit2_ev);
 }
+
