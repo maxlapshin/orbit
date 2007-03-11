@@ -22,7 +22,7 @@ static VALUE long_allocate(VALUE klass) {
 }
 static VALUE long_initialize(VALUE self, VALUE i) {
 	Check_Type(i, T_FIXNUM);
-	DATA_PTR(self) = NUM2INT(i);
+	DATA_PTR(self) = (void *)NUM2INT(i);
 	return self;
 }
 static VALUE long_to_i(VALUE self) {
@@ -65,6 +65,7 @@ void Init_ruby_orbit() {
 	rb_define_method(cLong, "initialize", long_initialize, 1);
 	rb_define_method(cLong, "to_i", long_to_i, 0);
 	rb_define_method(cLong, "=", long_initialize, 1);
+	rb_define_method(cLong, "replace", long_initialize, 1);
 	
 	ruby_orbit2_orb = CORBA_ORB_init(&argc, argv, "orbit-local-orb", &ruby_orbit2_ev);
 }

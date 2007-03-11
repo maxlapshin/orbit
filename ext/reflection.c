@@ -41,15 +41,39 @@ VALUE corba_object_describe_method(VALUE self, VALUE _method_name) {
 	rb_str_cat2(description, "(");
 	int i;
 	for(i = 0; i < method->arguments._length; i++) {
-		ORBit_IArg *arg = &method->arguments._buffer [i];
+		ORBit_IArg *arg = &method->arguments._buffer[i];
 		CORBA_TypeCode  tc = arg->tc;
 
 		while (tc->kind == CORBA_tk_alias)
 			tc = tc->subtypes [0];
+			
 		if(i > 0) {
 			rb_str_cat2(description, ", ");
 		}
+		if(arg->flags & ORBit_I_ARG_OUT) {
+			rb_str_cat2(description, "out ");
+		}
+		if(arg->flags & ORBit_I_ARG_INOUT) {
+			rb_str_cat2(description, "inout ");
+		}
 		rb_str_cat2(description, tc->name);
+		if(tc->kind == CORBA_tk_struct) {
+			int j;
+			rb_str_cat2(description, "{");
+			for(j = 0; j < tc->sub_parts; j++) {
+				if(j > 0) {
+					rb_str_cat2(description, ", ");
+				}
+				if(tc->subtypes[j]->name) {
+					rb_str_cat2(description, tc->subtypes[j]->name);
+					rb_str_cat2(description, " ");
+				} else if (tc->subtypes[j]->kind == CORBA_tk_string) {
+					rb_str_cat2(description, "string ");
+				}
+				rb_str_cat2(description, tc->subnames[j]);
+			}
+			rb_str_cat2(description, "}");
+		}
 		rb_str_cat2(description, " ");
 		rb_str_cat2(description, arg->name);
 	}

@@ -1,11 +1,20 @@
 #include "ruby_orbit.h"
 
+static void unmarshall_struct(VALUE struc, CORBA_TypeCode tc, gpointer struct_raw) {
+	int i;
+	int offset = 0;;
+	for(i = 0; i < tc->sub_parts; i++) {
+		offset = ALIGN_VALUE (offset, tc->subtypes[i]->c_align);
+		VALUE field = object_unmarshall(tc->subtypes[i], struct_raw + offset);
+		char method_name[100];
+		snprintf(method_name, sizeof(method_name), "%s=", tc->subnames[i]);
+		rb_funcall(struc, rb_intern(method_name), 1, field);
+		offset += tc->subtypes[i]->c_align;
+	}
+}
 
 void object_unmarshall_outvalues(ORBit_IMethod* method, int argc, VALUE *argv, gpointer *args, char *pool) {
 	int i;
-	int t = 0;
-	int *pool_pos = &t;
-	return;
 	for(i = 0; i < method->arguments._length; i++) {
 		ORBit_IArg *a = &method->arguments._buffer [i];
 		gpointer arg;
@@ -32,70 +41,59 @@ void object_unmarshall_outvalues(ORBit_IMethod* method, int argc, VALUE *argv, g
 		switch (tc->kind) {
 			case CORBA_tk_wchar:
 			case CORBA_tk_wstring: {
-				rb_raise(eCorbaError, "Wide char unsupported");
-				break;
+				rb_raise(eCorbaError, "Wide char demarshalling unsupported");
 			}
 			case CORBA_tk_char:
 			case CORBA_tk_string: {
-				Check_Type(argv[i], T_STRING);
-				char **val = (char **)(pool + *pool_pos);
-				*pool_pos += sizeof(char *);
-				*val = STR(argv[i]);
-				args[i] = val;
-				break;
+				rb_raise(eCorbaError, "String demarshalling unsupported");
 			}
 			case CORBA_tk_ushort:
 			case CORBA_tk_short: {
-				rb_raise(eCorbaError, "Short unsupported");
+				rb_raise(eCorbaError, "Short demarshalling unsupported");
 			}
 			case CORBA_tk_long:
 			case CORBA_tk_ulong: {
-				rb_raise(eCorbaError, "Long unsupported");
+				if(cLong == rb_class_of(argv[i])) {
+					DATA_PTR(argv[i]) = (void *)*(long *)arg;
+				}
+				break;
 			}
 			case CORBA_tk_longlong:
 			case CORBA_tk_ulonglong: {
-				rb_raise(eCorbaError, "Long Long unsupported");
+				rb_raise(eCorbaError, "Long Long demarshalling unsupported");
 			}
 			case CORBA_tk_double: {
-				Check_Type(argv[i], T_FLOAT);
-				double **val = (double **)(pool + *pool_pos);
-				*pool_pos += sizeof(double *);
-				*val = &(RFLOAT(argv[i])->value);
-				args[i] = val;
-				break;
+				rb_raise(eCorbaError, "Double demarshalling unsupported");
 			}
 			case CORBA_tk_longdouble: {
-				rb_raise(eCorbaError, "Long double unsupported");
+				rb_raise(eCorbaError, "Long double demarshalling unsupported");
 			}
 			case CORBA_tk_float: {
-				rb_raise(eCorbaError, "Float unsupported");
+				rb_raise(eCorbaError, "Float demarshalling unsupported");
 			}
 			case CORBA_tk_null:
 			case CORBA_tk_void: {
-				args[i] = NULL;
 				break;
 			}
 			case CORBA_tk_any: {
-				CORBA_any *encoded = (CORBA_any *)(pool + *pool_pos);
-				*pool_pos += sizeof(CORBA_any);
-				encoded->_type = TC_null;
-				encoded->_value = NULL;
-				if(T_FIXNUM == TYPE(argv[i]) || cLong == rb_class_of(argv[i])) {
-					encoded->_type = TC_CORBA_long;
-					encoded->_value = (long *)(pool + *pool_pos);
-					*pool_pos += sizeof(long);
-					if(T_FIXNUM == TYPE(argv[i])) {
-						*(long *)(encoded->_value) = FIX2INT(argv[i]);
-					} else {
-						*(long *)(encoded->_value) = DATA_PTR(argv[i]);
+				CORBA_any *encoded = arg;
+				switch(encoded->_type->kind) {
+					case CORBA_tk_long: {
+						if(cLong == rb_class_of(argv[i])) {
+							DATA_PTR(argv[i]) = (void *)*(long *)encoded->_value;
+						}
+						break;
 					}
-				} else if (T_STRING == TYPE(argv[i])) {
-					encoded->_type = TC_CORBA_string;
-					encoded->_value = (char **)(pool + *pool_pos);
-					*pool_pos += sizeof(char *);
-					*(char **)(encoded->_value) = STR(argv[i]);
+					case CORBA_tk_string: {
+						VALUE newstr = rb_str_new2(*(char **)encoded->_value);
+						rb_funcall(argv[i], rb_intern("replace"), 1, newstr);
+						break;
+					}
 				}
-				args[i] = encoded;
+				break;
+			}
+			case CORBA_tk_struct: {
+				unmarshall_struct(argv[i], tc, arg);
 				break;
 			}
 /*			
@@ -113,11 +111,8 @@ void object_unmarshall_outvalues(ORBit_IMethod* method, int argc, VALUE *argv, g
 			case CORBA_tk_fixed:
 		*/
 			default: {
-				rb_warn("Don't know, how to marshall kind %d. Marshalling nil", tc->kind);
-				char **val = (char **)(pool + *pool_pos);
-				*pool_pos += sizeof(char *);
-				*val = 0;
-				args[i] = val;
+				rb_warn("Don't know, how to demarshall %s. Marshalling nil", tc->name);
+				argv[i] = Qnil;
 				break;
 			}
 		}
@@ -187,10 +182,15 @@ VALUE object_unmarshall(CORBA_TypeCode tc, gpointer retval) {
 		case CORBA_tk_fixed: {
 			rb_raise(eCorbaError, "Nobody knows, how to unmarshall fixed");
 		}
+		case CORBA_tk_struct: {
+			VALUE klass = rb_funcall(cCorbaObject, rb_intern("lookup!"), 1, rb_str_new2(tc->name));
+			VALUE struc = rb_funcall(klass, rb_intern("new"), 0);
+			unmarshall_struct(struc, tc, retval);
+			return struc;
+		}
 		/*
 		case CORBA_tk_TypeCode:
 		case CORBA_tk_except:
-		case CORBA_tk_struct: 
 		case CORBA_tk_enum:
 		case CORBA_tk_union:
 		*/
@@ -199,7 +199,7 @@ VALUE object_unmarshall(CORBA_TypeCode tc, gpointer retval) {
 			rb_raise(eCorbaError, "Wide characters are not supported");
 		}
 		default: {
-			rb_raise(eCorbaError, "Some really amazing stuff met in output params");
+			rb_raise(eCorbaError, "Some really amazing stuff met in output params: %s", tc->name);
 		}
 	}
 	return Qtrue;
