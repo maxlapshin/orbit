@@ -29,6 +29,10 @@ static VALUE long_to_i(VALUE self) {
 	return INT2NUM((long)DATA_PTR(self));
 }
 
+gpointer allocate_in_pool(char *pool, int* pool_pos, int size) {
+	*pool_pos += size;
+	return pool + *pool_pos - size;
+}
 
 void Init_ruby_orbit() {
 	int argc = 0;

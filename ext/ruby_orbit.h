@@ -21,6 +21,9 @@ char* get_object_type_id(VALUE self);
 ORBit_IMethod* object_get_method(VALUE self, char *method_name);
 VALUE create_ruby_corba_object(CORBA_Object obj);
 void corba_object_free(CORBA_Object obj);
+gpointer allocate_in_pool(char *pool, int* pool_pos, int size);
+#define ALLOCATE(size) allocate_in_pool(pool, pool_pos, size)
+#define ALLOCATE_FOR(type) ALLOCATE(sizeof(type))
 
 void object_marshall_arguments(ORBit_IMethod* method, int argc, VALUE *argv, gpointer *args, char *pool, int* pool_pos);
 VALUE object_unmarshall(CORBA_TypeCode tc, gpointer retval);

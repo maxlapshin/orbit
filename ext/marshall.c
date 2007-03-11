@@ -4,11 +4,9 @@ void object_marshall_arguments(ORBit_IMethod* method, int argc, VALUE *argv, gpo
 	int i;
 	for(i = 0; i < method->arguments._length; i++) {
 		ORBit_IArg *a = &method->arguments._buffer [i];
-		if (!(a->flags & (ORBit_I_ARG_IN | ORBit_I_ARG_INOUT))) {
-			continue;
-		}
 		CORBA_TypeCode  tc;
 		tc = a->tc;
+		args[i] = NULL;
 
 		while (tc->kind == CORBA_tk_alias)
 			tc = tc->subtypes [0];
@@ -22,8 +20,7 @@ void object_marshall_arguments(ORBit_IMethod* method, int argc, VALUE *argv, gpo
 			case CORBA_tk_char:
 			case CORBA_tk_string: {
 				Check_Type(argv[i], T_STRING);
-				char **val = (char **)(pool + *pool_pos);
-				*pool_pos += sizeof(char *);
+				char **val = ALLOCATE_FOR(char *);
 				*val = STR(argv[i]);
 				args[i] = val;
 				break;
@@ -42,8 +39,7 @@ void object_marshall_arguments(ORBit_IMethod* method, int argc, VALUE *argv, gpo
 			}
 			case CORBA_tk_double: {
 				Check_Type(argv[i], T_FLOAT);
-				double **val = (double **)(pool + *pool_pos);
-				*pool_pos += sizeof(double *);
+				double **val = ALLOCATE_FOR(double *);
 				*val = &(RFLOAT(argv[i])->value);
 				args[i] = val;
 				break;
@@ -60,14 +56,12 @@ void object_marshall_arguments(ORBit_IMethod* method, int argc, VALUE *argv, gpo
 				break;
 			}
 			case CORBA_tk_any: {
-				CORBA_any *encoded = (CORBA_any *)(pool + *pool_pos);
-				*pool_pos += sizeof(CORBA_any);
+				CORBA_any *encoded = ALLOCATE_FOR(CORBA_any);
 				encoded->_type = TC_null;
 				encoded->_value = NULL;
 				if(T_FIXNUM == TYPE(argv[i]) || cLong == rb_class_of(argv[i])) {
 					encoded->_type = TC_CORBA_long;
-					encoded->_value = (long *)(pool + *pool_pos);
-					*pool_pos += sizeof(long);
+					encoded->_value = ALLOCATE_FOR(long);
 					if(T_FIXNUM == TYPE(argv[i])) {
 						*(long *)(encoded->_value) = FIX2INT(argv[i]);
 					} else {
@@ -75,14 +69,10 @@ void object_marshall_arguments(ORBit_IMethod* method, int argc, VALUE *argv, gpo
 					}
 				} else if (T_STRING == TYPE(argv[i])) {
 					encoded->_type = TC_CORBA_string;
-					encoded->_value = (char **)(pool + *pool_pos);
-					*pool_pos += sizeof(char *);
+					encoded->_value = ALLOCATE_FOR(char *);
 					*(char **)(encoded->_value) = STR(argv[i]);
 				}
-				CORBA_any **encoded_ptr = (CORBA_any **)(pool + *pool_pos);
-				*pool_pos += sizeof(CORBA_any);
-				*encoded_ptr = encoded;
-				args[i] = encoded_ptr;
+				args[i] = encoded;
 				break;
 			}
 /*			
