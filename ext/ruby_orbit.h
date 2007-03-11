@@ -8,10 +8,29 @@
 #include <orbit/orbit.h>
 #include <orbit/orbit-types.h>
 #include <orbit/orb-core/orbit-small.h>
+//#include <glib/ghash.h>
 #include "ruby.h"
 #include "rubyio.h"
 
-extern VALUE mORBit2, cCorbaObject, eCorbaError;
+extern VALUE mORBit2, cCorbaObject, eCorbaError, mOrphan, cLong, cBool;
+extern CORBA_Environment ruby_orbit2_ev;
+extern CORBA_ORB ruby_orbit2_orb;
+
+
+char* get_object_type_id(VALUE self);
+ORBit_IMethod* object_get_method(VALUE self, char *method_name);
+VALUE create_ruby_corba_object(CORBA_Object obj);
+void corba_object_free(CORBA_Object obj);
+
+void object_marshall_arguments(ORBit_IMethod* method, int argc, VALUE *argv, gpointer *args, char *pool, int* pool_pos);
+VALUE object_unmarshall(CORBA_TypeCode tc, gpointer retval);
+VALUE corba_object_methods(VALUE self);
+VALUE corba_object_type_id(VALUE self);
+VALUE corba_object_ior(VALUE self);
+VALUE corba_object_describe_method(VALUE self, VALUE _method_name);
+VALUE corba_object_is_a(VALUE self, VALUE type);
+VALUE orphan_create(VALUE self, VALUE klass_name_list);
+VALUE corba_object_invoke_method(int argc, VALUE *argv, VALUE self);
 
 #define STR(x) (RSTRING(x)->ptr)
 
