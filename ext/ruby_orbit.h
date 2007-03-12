@@ -26,6 +26,7 @@ gpointer allocate_in_pool(char *pool, int* pool_pos, int size);
 #define ALLOCATE_FOR(type) ALLOCATE(sizeof(type))
 
 void object_marshall_arguments(ORBit_IMethod* method, int argc, VALUE *argv, gpointer *args, char *pool, int* pool_pos);
+void object_unmarshall_outvalues(ORBit_IMethod* method, int argc, VALUE *argv, gpointer *args, char *pool);
 VALUE object_unmarshall(CORBA_TypeCode tc, gpointer retval);
 VALUE corba_object_methods(VALUE self);
 VALUE corba_object_type_id(VALUE self);

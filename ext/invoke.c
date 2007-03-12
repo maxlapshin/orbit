@@ -3,13 +3,7 @@
 const int ARG_POOL_SIZE = 256;
 
 static gpointer allocate_retval_in_pool(ORBit_IMethod* method, char *pool, int* pool_pos) {
-	CORBA_TypeCode tc;
-	tc = method->ret;
-	if(!tc || tc->kind == CORBA_tk_void || tc->kind == CORBA_tk_null) {
-		return NULL;	
-	}
-	*pool_pos += tc->c_length;
-	return pool;
+	return ALLOCATE(ORBit_gather_alloc_info(method->ret));
 }
 
 VALUE corba_object_invoke_method(int argc, VALUE *argv, VALUE self) {
@@ -29,12 +23,19 @@ VALUE corba_object_invoke_method(int argc, VALUE *argv, VALUE self) {
 	
 	gpointer _args[method->arguments._length];
 	char pool[ARG_POOL_SIZE];
+	printf("Pool address is %#x\n", pool);
 	int pool_pos = 0;
 	gpointer retval = allocate_retval_in_pool(method, pool, &pool_pos);
 	char* pool_of_args = pool+pool_pos;
 	object_marshall_arguments(method, argc, argv, _args, pool, &pool_pos);
-	ORBit_small_invoke_stub (DATA_PTR(self), method, retval, _args, NULL,	&ruby_orbit2_ev);
+	ORBit_small_invoke_stub (DATA_PTR(self), method, retval, _args, NULL, &ruby_orbit2_ev);
 
 	object_unmarshall_outvalues(method, argc, argv, _args, pool_of_args);
+	
+	if(!(method->flags & ORBit_I_COMMON_FIXED_SIZE)) {
+		if(method->ret->kind == CORBA_tk_struct) {
+			retval = *(gpointer *)retval;
+		}
+	}
 	return object_unmarshall(method->ret, retval);
 }

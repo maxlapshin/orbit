@@ -94,7 +94,10 @@ static gpointer marshall_value(CORBA_TypeCode tc, VALUE value, char *pool, int* 
 				gpointer marshalled = marshall_value(tc->subtypes[i], field, pool, pool_pos, 0);
 				memcpy(struct_raw + offset, marshalled, tc->subtypes[i]->c_align);
 			}
-			return struct_raw;
+			if(!out) return struct_raw;
+			char **struct_ptr = ALLOCATE_FOR(char *);
+			*struct_ptr = struct_raw;
+			return struct_ptr;
 		}
 /*		
 		case CORBA_tk_Principal:

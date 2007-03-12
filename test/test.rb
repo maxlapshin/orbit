@@ -35,16 +35,6 @@ class TestFactory < Test::Unit::TestCase
     assert_equal 2014458966, out.to_i
   end
   
-  def test_struct
-    _in = FixedLengthStruct.new(0x1234)
-    inout = FixedLengthStruct.new(0x3456)
-    out = FixedLengthStruct.new
-    retn = @structServer.opFixed(_in, inout, out)
-    assert_equal 0xAABB, retn.a
-    assert_equal 0x5678, inout.a
-    assert_equal 0x7812, out.a
-  end
-
   def test_any
     return unless @server.is_a?("IDL:orbit/test/TestFactory:1.0")
     @anyServer = @server.getAnyServer
@@ -53,7 +43,7 @@ class TestFactory < Test::Unit::TestCase
 
     _in = 0x12345678
     inout = ORBit2::Long.new 0x34567812
-    out = ORBit2::Long.new 0  
+    out = ORBit2::Long.new 0
     assert_equal -1430532899, @anyServer.opAnyLong(_in, inout, out)
     assert_equal 1450709556, inout.to_i
     assert_equal 2014458966, out.to_i
@@ -67,6 +57,7 @@ class TestFactory < Test::Unit::TestCase
   end
   
   def test_struct
+    puts "Testing struct"
     return unless @server.is_a?("IDL:orbit/test/TestFactory:1.0")
     @structServer = @server.getStructServer
     assert_equal ["opFixed", "opVariable", "opCompound", "opAlignHole", "opObjectStruct", "opStructAny"], @structServer.corba_methods
