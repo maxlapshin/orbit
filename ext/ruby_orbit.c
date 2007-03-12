@@ -58,7 +58,7 @@ void Init_ruby_orbit() {
 	CORBA_exception_init(&ruby_orbit2_ev);
 	
 	mOrphan = rb_define_module_under(mORBit2, "Orphan");
-	rb_define_singleton_method(mOrphan, "create", orphan_create, 1);
+	rb_define_singleton_method(mOrphan, "lookup", orphan_lookup, 2);
 	
 	cLong = rb_define_class_under(mORBit2, "Long", rb_cObject);
 	rb_define_alloc_func(cLong, long_allocate);

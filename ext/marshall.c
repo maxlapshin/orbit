@@ -30,6 +30,7 @@ static gpointer marshall_value(CORBA_TypeCode tc, VALUE value, char *pool, int* 
 			*val_ptr = val;
 			return val_ptr;
 		}
+		case CORBA_tk_enum:
 		case CORBA_tk_long:
 		case CORBA_tk_ulong: {
 			long *val = ALLOCATE_FOR(long);
@@ -49,15 +50,24 @@ static gpointer marshall_value(CORBA_TypeCode tc, VALUE value, char *pool, int* 
 		}
 		case CORBA_tk_double: {
 			Check_Type(value, T_FLOAT);
-			double **val = ALLOCATE_FOR(double *);
-			*val = &(RFLOAT(value)->value);
-			return val;
+			double *val = ALLOCATE_FOR(double);
+			*val = RFLOAT(value)->value;
+			if(!out) return val;
+			double **val_ptr = ALLOCATE_FOR(double *);
+			*val_ptr = val;
+			return val_ptr;
 		}
 		case CORBA_tk_longdouble: {
 			rb_raise(eCorbaError, "Long double unsupported");
 		}
 		case CORBA_tk_float: {
-			rb_raise(eCorbaError, "Float unsupported");
+			Check_Type(value, T_FLOAT);
+			float *val = ALLOCATE_FOR(float);
+			*val = (float)RFLOAT(value)->value;
+			if(!out) return val;
+			float **val_ptr = ALLOCATE_FOR(float *);
+			*val_ptr = val;
+			return val_ptr;
 		}
 		case CORBA_tk_null:
 		case CORBA_tk_void: {
@@ -101,13 +111,12 @@ static gpointer marshall_value(CORBA_TypeCode tc, VALUE value, char *pool, int* 
 			return struct_ptr;
 		}
 /*		
+		case CORBA_tk_sequence:
 		case CORBA_tk_Principal:
 		case CORBA_tk_objref:
 		case CORBA_tk_TypeCode:
 		case CORBA_tk_except:
-		case CORBA_tk_struct:
 		case CORBA_tk_union:
-		case CORBA_tk_sequence:
 		case CORBA_tk_boolean:
 		case CORBA_tk_char:
 		case CORBA_tk_octet:

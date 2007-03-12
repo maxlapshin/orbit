@@ -33,7 +33,7 @@ VALUE corba_object_type_id(VALUE self);
 VALUE corba_object_ior(VALUE self);
 VALUE corba_object_describe_method(VALUE self, VALUE _method_name);
 VALUE corba_object_is_a(VALUE self, VALUE type);
-VALUE orphan_create(VALUE self, VALUE klass_name_list);
+VALUE orphan_lookup(VALUE self, VALUE klass_name_list, VALUE parent);
 VALUE corba_object_invoke_method(int argc, VALUE *argv, VALUE self);
 
 #define STR(x) (RSTRING(x)->ptr)

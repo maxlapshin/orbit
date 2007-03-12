@@ -28,6 +28,29 @@ VALUE corba_object_ior(VALUE self) {
 	return retval;
 }
 
+static void describe_type(VALUE description, CORBA_TypeCode tc) {
+	if(tc->kind == CORBA_tk_struct) {
+		int j;
+		rb_str_cat2(description, "{");
+		for(j = 0; j < tc->sub_parts; j++) {
+			if(j > 0) {
+				rb_str_cat2(description, ", ");
+			}
+			describe_type(description, tc->subtypes[j]);
+			rb_str_cat2(description, tc->subnames[j]);
+		}
+		rb_str_cat2(description, "} ");
+	} else if (tc->kind == CORBA_tk_sequence) {
+		describe_type(description, tc->subtypes[0]);
+		rb_str_cat2(description, "[] ");
+	} else if(tc->name) {
+		rb_str_cat2(description, tc->name);
+		rb_str_cat2(description, " ");
+	} else if (tc->kind == CORBA_tk_string) {
+		rb_str_cat2(description, "string ");
+	}
+}
+
 VALUE corba_object_describe_method(VALUE self, VALUE _method_name) {
 	VALUE method_name = rb_funcall(_method_name, rb_intern("to_s"), 0);
 	ORBit_IMethod* method = object_get_method(self, STR(method_name));
@@ -35,8 +58,7 @@ VALUE corba_object_describe_method(VALUE self, VALUE _method_name) {
 		return Qnil;
 	}
 	VALUE description = rb_str_new("", 0);
-	rb_str_cat2(description, method->ret->name);
-	rb_str_cat2(description, " ");
+	describe_type(description, method->ret);
 	rb_str_cat2(description, method->name);
 	rb_str_cat2(description, "(");
 	int i;
@@ -56,28 +78,17 @@ VALUE corba_object_describe_method(VALUE self, VALUE _method_name) {
 		if(arg->flags & ORBit_I_ARG_INOUT) {
 			rb_str_cat2(description, "inout ");
 		}
-		rb_str_cat2(description, tc->name);
-		if(tc->kind == CORBA_tk_struct) {
-			int j;
-			rb_str_cat2(description, "{");
-			for(j = 0; j < tc->sub_parts; j++) {
-				if(j > 0) {
-					rb_str_cat2(description, ", ");
-				}
-				if(tc->subtypes[j]->name) {
-					rb_str_cat2(description, tc->subtypes[j]->name);
-					rb_str_cat2(description, " ");
-				} else if (tc->subtypes[j]->kind == CORBA_tk_string) {
-					rb_str_cat2(description, "string ");
-				}
-				rb_str_cat2(description, tc->subnames[j]);
-			}
-			rb_str_cat2(description, "}");
-		}
-		rb_str_cat2(description, " ");
+		describe_type(description, tc);
 		rb_str_cat2(description, arg->name);
 	}
-	rb_str_cat2(description, ");");
+	rb_str_cat2(description, ")");
+	if(method->exceptions._length > 0) {
+		rb_str_cat2(description, " throws ");
+	}
+	for(i = 0; i < method->exceptions._length; i++) {
+		describe_type(description, method->exceptions._buffer[i]);
+	}
+	rb_str_cat2(description, ";");
 	return description;
 }
 
@@ -86,13 +97,38 @@ VALUE corba_object_is_a(VALUE self, VALUE type) {
 	return CORBA_Object_is_a(DATA_PTR(self), STR(type), &ruby_orbit2_ev) ? Qtrue : Qfalse;
 }
 
-VALUE orphan_create(VALUE self, VALUE klass_name_list) {
-	Check_Type(klass_name_list, T_ARRAY);
+
+static VALUE orphan_lookup_find(VALUE where, VALUE klass_name_list, VALUE parent, int create) {
 	int i;
-	VALUE module = mOrphan;
-	for(i = 0; i < RARRAY(klass_name_list)->len-2; i++) {
-		module = rb_define_module_under(module, STR(RARRAY(klass_name_list)->ptr[i]));
+	ID id;
+	VALUE module = where;
+	for(i = 0; i < RARRAY(klass_name_list)->len-1; i++) {
+		id = rb_intern(STR(RARRAY(klass_name_list)->ptr[i]));
+		if(rb_const_defined(module, id)) {
+			module = rb_const_get(module, id);
+		} else if (create) {
+			module = rb_define_module_under(module, STR(RARRAY(klass_name_list)->ptr[i]));
+		} else {
+			return Qnil;
+		}
 	}
-	return rb_define_class_under(module, STR(RARRAY(klass_name_list)->ptr[i]), cCorbaObject);
+	id = rb_intern(STR(RARRAY(klass_name_list)->ptr[i]));
+	if(rb_const_defined(module, id)) {
+		return rb_const_get(module, id);
+	}
+	if(create) {
+		return rb_define_class_under(module, STR(RARRAY(klass_name_list)->ptr[i]), parent);
+	} else {
+		return Qnil;
+	}
+}
+
+VALUE orphan_lookup(VALUE self, VALUE klass_name_list, VALUE parent) {
+	Check_Type(klass_name_list, T_ARRAY);
+	VALUE klass = orphan_lookup_find(rb_cObject, klass_name_list, parent, 0);
+	if(klass == Qnil) {
+		klass = orphan_lookup_find(mOrphan, klass_name_list, parent, 1);
+	}
+	return klass;
 }
 

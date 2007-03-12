@@ -6,6 +6,15 @@ static gpointer allocate_retval_in_pool(ORBit_IMethod* method, char *pool, int* 
 	return ALLOCATE(ORBit_gather_alloc_info(method->ret));
 }
 
+static void handle_exception(void) {
+	if(ruby_orbit2_ev._major == CORBA_NO_EXCEPTION) {
+		return;
+	}
+	VALUE exception = rb_funcall(cCorbaObject, rb_intern("lookup!"), 2, rb_str_new2(CORBA_exception_id (&ruby_orbit2_ev)), eCorbaError);
+	CORBA_exception_free (&ruby_orbit2_ev);
+	rb_raise(exception, "Got %s exception", ruby_orbit2_ev._major == CORBA_USER_EXCEPTION ? "user" : "system");
+}
+
 VALUE corba_object_invoke_method(int argc, VALUE *argv, VALUE self) {
 	if(argc < 1) {
 		rb_raise(eCorbaError, "Method name must be first argument");
@@ -29,6 +38,7 @@ VALUE corba_object_invoke_method(int argc, VALUE *argv, VALUE self) {
 	object_marshall_arguments(method, argc, argv, _args, pool, &pool_pos);
 	ORBit_small_invoke_stub (DATA_PTR(self), method, retval, _args, NULL, &ruby_orbit2_ev);
 	
+	handle_exception();
 	object_unmarshall_outvalues(method, argc, argv, _args, pool_of_args);
 	
 	if(!(method->flags & ORBit_I_COMMON_FIXED_SIZE)) {

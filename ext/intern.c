@@ -6,8 +6,26 @@ ORBit_IMethod* object_get_method(VALUE self, char *method_name) {
 	ORBit_IInterface* interface = ORBit_small_get_iinterface(DATA_PTR(self), get_object_type_id(self), &ruby_orbit2_ev);
 	int i = 0;
 	int method_index = -1;
+	char getter_name[strlen(method_name)+6];
+	snprintf(getter_name, sizeof(getter_name), "_get_%s", method_name);
+	
+	char setter_name[strlen(method_name)+6];
+	snprintf(setter_name, sizeof(setter_name), "_set_%s", method_name);
+	if(setter_name[strlen(setter_name)-1] == '=') {
+		setter_name[strlen(setter_name)-1] = 0;
+	} else {
+		setter_name[0] = 0;
+	}
 	for(i = 0; i < interface->methods._length; i++) {
 		if(!strcmp(interface->methods._buffer[i].name, method_name)) {
+			method_index = i;
+			break;
+		}
+		if(!strcmp(interface->methods._buffer[i].name, getter_name)) {
+			method_index = i;
+			break;
+		}
+		if(*setter_name && !strcmp(interface->methods._buffer[i].name, setter_name)) {
 			method_index = i;
 			break;
 		}

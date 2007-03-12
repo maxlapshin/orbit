@@ -45,12 +45,17 @@ void object_unmarshall_outvalues(ORBit_IMethod* method, int argc, VALUE *argv, g
 			}
 			case CORBA_tk_char:
 			case CORBA_tk_string: {
-				rb_raise(eCorbaError, "String demarshalling unsupported");
+				if(T_STRING == TYPE(argv[i])) {
+					VALUE retval = rb_str_new2(*(char **)arg);
+					rb_funcall(argv[i], rb_intern("replace"), 1, retval);
+				}
+				break;
 			}
 			case CORBA_tk_ushort:
 			case CORBA_tk_short: {
 				rb_raise(eCorbaError, "Short demarshalling unsupported");
 			}
+			case CORBA_tk_enum:
 			case CORBA_tk_long:
 			case CORBA_tk_ulong: {
 				if(cLong == rb_class_of(argv[i])) {
@@ -63,13 +68,16 @@ void object_unmarshall_outvalues(ORBit_IMethod* method, int argc, VALUE *argv, g
 				rb_raise(eCorbaError, "Long Long demarshalling unsupported");
 			}
 			case CORBA_tk_double: {
-				rb_raise(eCorbaError, "Double demarshalling unsupported");
+				RFLOAT(argv[i])->value = *(double *)arg;
+				break;
 			}
 			case CORBA_tk_longdouble: {
 				rb_raise(eCorbaError, "Long double demarshalling unsupported");
 			}
 			case CORBA_tk_float: {
-				rb_raise(eCorbaError, "Float demarshalling unsupported");
+				float val = *(float *)arg;
+				RFLOAT(argv[i])->value = (double)val;
+				break;
 			}
 			case CORBA_tk_null:
 			case CORBA_tk_void: {
@@ -101,7 +109,6 @@ void object_unmarshall_outvalues(ORBit_IMethod* method, int argc, VALUE *argv, g
 			case CORBA_tk_objref:
 			case CORBA_tk_TypeCode:
 			case CORBA_tk_except:
-			case CORBA_tk_struct:
 			case CORBA_tk_union:
 			case CORBA_tk_sequence:
 			case CORBA_tk_boolean:
@@ -131,6 +138,7 @@ VALUE object_unmarshall(CORBA_TypeCode tc, gpointer retval) {
 		case CORBA_tk_long: {
 			return INT2NUM(*(long *)retval);
 		}
+		case CORBA_tk_enum:
 		case CORBA_tk_ulong: {
 			return INT2NUM(*(unsigned long *)retval);
 		}
@@ -191,7 +199,6 @@ VALUE object_unmarshall(CORBA_TypeCode tc, gpointer retval) {
 		/*
 		case CORBA_tk_TypeCode:
 		case CORBA_tk_except:
-		case CORBA_tk_enum:
 		case CORBA_tk_union:
 		*/
 		case CORBA_tk_wchar: 
