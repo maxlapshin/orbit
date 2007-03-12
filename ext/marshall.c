@@ -68,6 +68,7 @@ static gpointer marshall_value(CORBA_TypeCode tc, VALUE value, char *pool, int* 
 			CORBA_any *encoded = ALLOCATE_FOR(CORBA_any);
 			encoded->_type = TC_null;
 			encoded->_value = NULL;
+			encoded->_release = 0;
 			if(T_FIXNUM == TYPE(value) || cLong == rb_class_of(value)) {
 				encoded->_type = TC_CORBA_long;
 				encoded->_value = ALLOCATE_FOR(long);

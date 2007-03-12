@@ -23,13 +23,12 @@ VALUE corba_object_invoke_method(int argc, VALUE *argv, VALUE self) {
 	
 	gpointer _args[method->arguments._length];
 	char pool[ARG_POOL_SIZE];
-	printf("Pool address is %#x\n", pool);
 	int pool_pos = 0;
 	gpointer retval = allocate_retval_in_pool(method, pool, &pool_pos);
 	char* pool_of_args = pool+pool_pos;
 	object_marshall_arguments(method, argc, argv, _args, pool, &pool_pos);
 	ORBit_small_invoke_stub (DATA_PTR(self), method, retval, _args, NULL, &ruby_orbit2_ev);
-
+	
 	object_unmarshall_outvalues(method, argc, argv, _args, pool_of_args);
 	
 	if(!(method->flags & ORBit_I_COMMON_FIXED_SIZE)) {

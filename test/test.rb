@@ -57,7 +57,6 @@ class TestFactory < Test::Unit::TestCase
   end
   
   def test_struct
-    puts "Testing struct"
     return unless @server.is_a?("IDL:orbit/test/TestFactory:1.0")
     @structServer = @server.getStructServer
     assert_equal ["opFixed", "opVariable", "opCompound", "opAlignHole", "opObjectStruct", "opStructAny"], @structServer.corba_methods
