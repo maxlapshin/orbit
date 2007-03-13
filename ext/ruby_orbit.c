@@ -29,6 +29,20 @@ static VALUE long_to_i(VALUE self) {
 	return INT2NUM((long)DATA_PTR(self));
 }
 
+static VALUE long_equal(VALUE self, VALUE l) {
+	if(T_FIXNUM == TYPE(l)) {
+		return NUM2INT(l) == (long)DATA_PTR(self) ? Qtrue : Qfalse;
+	}
+	if(T_BIGNUM == TYPE(l)) {
+		long long ll = rb_big2ll(l);
+		return ll == (long long)(long)DATA_PTR(self) ? Qtrue : Qfalse;
+	}
+	if(cLong == rb_class_of(l)) {
+		return DATA_PTR(self) == DATA_PTR(l) ? Qtrue : Qfalse;
+	}
+	return Qfalse;
+}
+
 gpointer allocate_in_pool(char *pool, int* pool_pos, int size) {
 	*pool_pos += size;
 	return pool + *pool_pos - size;
@@ -64,7 +78,9 @@ void Init_ruby_orbit() {
 	rb_define_alloc_func(cLong, long_allocate);
 	rb_define_method(cLong, "initialize", long_initialize, 1);
 	rb_define_method(cLong, "to_i", long_to_i, 0);
+	rb_define_method(cLong, "to_int", long_to_i, 0);
 	rb_define_method(cLong, "=", long_initialize, 1);
+	rb_define_method(cLong, "==", long_equal, 1);
 	rb_define_method(cLong, "replace", long_initialize, 1);
 	
 	ruby_orbit2_orb = CORBA_ORB_init(&argc, argv, "orbit-local-orb", &ruby_orbit2_ev);

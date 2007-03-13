@@ -31,6 +31,7 @@ VALUE corba_object_ior(VALUE self) {
 static void describe_type(VALUE description, CORBA_TypeCode tc) {
 	if(tc->kind == CORBA_tk_struct) {
 		int j;
+		rb_str_cat2(description, tc->name);
 		rb_str_cat2(description, "{");
 		for(j = 0; j < tc->sub_parts; j++) {
 			if(j > 0) {

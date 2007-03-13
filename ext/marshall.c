@@ -11,6 +11,15 @@ static gpointer marshall_value(CORBA_TypeCode tc, VALUE value, char *pool, int* 
 			break;
 		}
 		case CORBA_tk_char:
+		case CORBA_tk_octet: {
+			char *val = ALLOCATE_FOR(char);
+			if(T_FIXNUM == TYPE(value) || cLong == rb_class_of(value)) {
+				*val = (char)NUM2INT(value);
+			} else {
+				rb_raise(rb_eTypeError, "wrong type argument %s (expected Fixnum or ORBit2::Long)", rb_obj_classname(value));
+			}
+			return val;
+		}
 		case CORBA_tk_string: {
 			Check_Type(value, T_STRING);
 			char **val = ALLOCATE_FOR(char *);
@@ -22,8 +31,10 @@ static gpointer marshall_value(CORBA_TypeCode tc, VALUE value, char *pool, int* 
 			short *val = ALLOCATE_FOR(short);
 			if(T_FIXNUM == TYPE(value)) {
 				*(short *)(val) = (short)FIX2INT(value);
-			} else {
+			} else if(cLong == rb_class_of(value)){
 				*(short *)(val) = (short)(long)DATA_PTR(value);
+			} else {
+				rb_raise(rb_eTypeError, "wrong type argument %s (expected Fixnum or ORBit2::Long)", rb_obj_classname(value));
 			}
 			if(!out) return val;
 			short **val_ptr = ALLOCATE_FOR(short *);
@@ -36,8 +47,10 @@ static gpointer marshall_value(CORBA_TypeCode tc, VALUE value, char *pool, int* 
 			long *val = ALLOCATE_FOR(long);
 			if(T_FIXNUM == TYPE(value)) {
 				*(long *)(val) = FIX2INT(value);
-			} else {
+			} else if (cLong == rb_class_of(value)) {
 				*(long *)(val) = (long)DATA_PTR(value);
+			} else {
+				rb_raise(rb_eTypeError, "wrong type argument %s (expected Fixnum or ORBit2::Long)", rb_obj_classname(value));
 			}
 			if(!out) return val;
 			long **val_ptr = ALLOCATE_FOR(long *);
@@ -100,26 +113,36 @@ static gpointer marshall_value(CORBA_TypeCode tc, VALUE value, char *pool, int* 
 			int i;
 			int offset = 0;;
 			for(i = 0; i < tc->sub_parts; i++) {
+				size_t field_size = ORBit_gather_alloc_info (tc->subtypes[i]);
 				offset = ALIGN_VALUE (offset, tc->subtypes[i]->c_align);
 				VALUE field = rb_funcall(value, rb_intern(tc->subnames[i]), 0);
 				gpointer marshalled = marshall_value(tc->subtypes[i], field, pool, pool_pos, 0);
-				memcpy(struct_raw + offset, marshalled, tc->subtypes[i]->c_align);
+				memcpy(struct_raw + offset, marshalled, field_size);
+				offset += field_size;
 			}
 			if(!out) return struct_raw;
 			char **struct_ptr = ALLOCATE_FOR(char *);
 			*struct_ptr = struct_raw;
 			return struct_ptr;
 		}
+		case CORBA_tk_objref: {
+			if(!rb_obj_is_kind_of(value, cCorbaObject)) {
+				rb_raise(rb_eTypeError, "wrong type argument %s (expected ancestor of ORBit2::CorbaObject)", rb_obj_classname(value));
+			}
+			CORBA_Object* obj = ALLOCATE_FOR(CORBA_Object);
+			*obj = (CORBA_Object)DATA_PTR(value);
+			if(!out) return obj;
+			CORBA_Object **ptr = ALLOCATE_FOR(CORBA_Object *);
+			*ptr = obj;
+			return ptr;
+		}
 /*		
 		case CORBA_tk_sequence:
 		case CORBA_tk_Principal:
-		case CORBA_tk_objref:
 		case CORBA_tk_TypeCode:
 		case CORBA_tk_except:
 		case CORBA_tk_union:
 		case CORBA_tk_boolean:
-		case CORBA_tk_char:
-		case CORBA_tk_octet:
 		case CORBA_tk_array:
 		case CORBA_tk_fixed:
 	*/

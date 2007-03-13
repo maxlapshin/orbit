@@ -1,15 +1,14 @@
 require 'test/unit'
 require File.dirname(__FILE__)+"/../lib/ruby-orbit"
 
-class FixedLengthStruct
-  attr_accessor :a
-  def initialize(value = nil)
-    @a = value || 4
-  end
-end
-
+FixedLengthStruct = Struct.new :a
 VariableLengthStruct = FixedLengthStruct
 CompoundStruct = FixedLengthStruct
+AlignHoleInnerStruct = Struct.new :a, :b
+AlignHoleStruct = AlignHoleInnerStruct
+StructAny = AlignHoleInnerStruct
+ObjectStruct = Struct.new :serv
+
 
 module Orbit
   module Test
@@ -38,6 +37,11 @@ class TestFactory < Test::Unit::TestCase
     @server = self.class.server
   end
   
+  def test_long
+    assert_equal ORBit2::Long.new(4), 4
+    assert_equal 4, ORBit2::Long.new(4)
+  end
+  
   def test_basic
     return unless @server.is_a?("IDL:orbit/test/TestFactory:1.0")
     @basicServer = @server.getBasicServer
@@ -63,6 +67,14 @@ class TestFactory < Test::Unit::TestCase
     assert_equal -1430532899, @basicServer.opLong(_in, inout, out)
     assert_equal 1450709556, inout.to_i
     assert_equal 2014458966, out.to_i
+
+    _in = 127.13534
+    inout = 124.89432
+    out = 0.0
+    assert_equal 354.23535, ((@basicServer.opFloat(_in, inout, out)*100000).floor*1.0)/100000
+    assert_equal 975.12695, ((inout*100000).floor*1.0)/100000
+    assert_equal 112.54575, ((out*100000).floor*1.0)/100000
+
 
     _in = 127.13534
     inout = 124.89432
@@ -104,13 +116,13 @@ class TestFactory < Test::Unit::TestCase
     assert_equal "Out string", out
   end
   
-  def test_struct
+  def test_struct(struct_server = nil)
     return unless @server.is_a?("IDL:orbit/test/TestFactory:1.0")
-    @structServer = @server.getStructServer
+    @structServer = struct_server || @server.getStructServer
     assert_equal ["opFixed", "opVariable", "opCompound", "opAlignHole", "opObjectStruct", "opStructAny"], @structServer.corba_methods
     _in = FixedLengthStruct.new(0x1234)
-    inout = FixedLengthStruct.new(0x3456)
-    out = FixedLengthStruct.new
+    inout = FixedLengthStruct.new(ORBit2::Long.new(0x3456))
+    out = FixedLengthStruct.new(ORBit2::Long.new(0))
     retn = @structServer.opFixed(_in, inout, out)
     assert_equal 0xAABB, retn.a
     assert_equal 0x5678, inout.a
@@ -132,5 +144,26 @@ class TestFactory < Test::Unit::TestCase
     assert_equal "Inout out string", inout.a.a
     assert_equal "Out string", out.a.a
     assert_equal "Retn String", retn.a.a
+
+    _in = AlignHoleStruct.new(AlignHoleInnerStruct.new(127.13534, 0x13), 0x23)
+    inout = AlignHoleStruct.new(AlignHoleInnerStruct.new(124.89432, ORBit2::Long.new(0x35)), ORBit2::Long.new(0x45))
+    out = AlignHoleStruct.new(AlignHoleInnerStruct.new(0.0, ORBit2::Long.new(0)), ORBit2::Long.new(0))
+    retn = @structServer.opAlignHole(_in, inout, out)
+    assert_equal AlignHoleStruct.new(AlignHoleInnerStruct.new(354.23535, ORBit2::Long.new(0xBD)), ORBit2::Long.new(0xAC)), retn
+    assert_equal AlignHoleStruct.new(AlignHoleInnerStruct.new(975.12694, ORBit2::Long.new(0x57)), ORBit2::Long.new(0x67)), inout
+    assert_equal AlignHoleStruct.new(AlignHoleInnerStruct.new(112.54575, ORBit2::Long.new(0x79)), ORBit2::Long.new(0x89)), out
+    
+    @derivedServer = @server.getDerivedServer
+    @structServer.opObjectStruct(ObjectStruct.new(@derivedServer))
+    
+    retn = @structServer.opStructAny
+    assert_equal StructAny.new("In string", 0x12345678), retn
+  end
+  
+  def test_struct_server_ior
+    return unless @server.is_a?("IDL:orbit/test/TestFactory:1.0")
+    ior = @server.getStructServerIOR
+    @structServer = ORBit2::CorbaObject.from_ior(ior)
+    test_struct(@structServer)
   end
 end

@@ -9,7 +9,7 @@ static void unmarshall_struct(VALUE struc, CORBA_TypeCode tc, gpointer struct_ra
 		char method_name[100];
 		snprintf(method_name, sizeof(method_name), "%s=", tc->subnames[i]);
 		rb_funcall(struc, rb_intern(method_name), 1, field);
-		offset += tc->subtypes[i]->c_align;
+		offset += ORBit_gather_alloc_info (tc->subtypes[i]);;
 	}
 }
 
@@ -43,7 +43,6 @@ void object_unmarshall_outvalues(ORBit_IMethod* method, int argc, VALUE *argv, g
 			case CORBA_tk_wstring: {
 				rb_raise(eCorbaError, "Wide char demarshalling unsupported");
 			}
-			case CORBA_tk_char:
 			case CORBA_tk_string: {
 				if(T_STRING == TYPE(argv[i])) {
 					VALUE retval = rb_str_new2(*(char **)arg);
@@ -51,9 +50,24 @@ void object_unmarshall_outvalues(ORBit_IMethod* method, int argc, VALUE *argv, g
 				}
 				break;
 			}
-			case CORBA_tk_ushort:
+			case CORBA_tk_char:
+			case CORBA_tk_octet: {
+				if(cLong == rb_class_of(argv[i])) {
+					DATA_PTR(argv[i]) = (void *)(long)*(char *)arg;
+				}
+				break;
+			}
+			case CORBA_tk_ushort: {
+				if(cLong == rb_class_of(argv[i])) {
+					DATA_PTR(argv[i]) = (void *)(unsigned short)*(char *)arg;
+				}
+				break;
+			}
 			case CORBA_tk_short: {
-				rb_raise(eCorbaError, "Short demarshalling unsupported");
+				if(cLong == rb_class_of(argv[i])) {
+					DATA_PTR(argv[i]) = (void *)(short)*(char *)arg;
+				}
+				break;
 			}
 			case CORBA_tk_enum:
 			case CORBA_tk_long:
@@ -112,8 +126,6 @@ void object_unmarshall_outvalues(ORBit_IMethod* method, int argc, VALUE *argv, g
 			case CORBA_tk_union:
 			case CORBA_tk_sequence:
 			case CORBA_tk_boolean:
-			case CORBA_tk_char:
-			case CORBA_tk_octet:
 			case CORBA_tk_array:
 			case CORBA_tk_fixed:
 		*/
@@ -152,7 +164,7 @@ VALUE object_unmarshall(CORBA_TypeCode tc, gpointer retval) {
 			return rb_float_new((double)(*(long double *)retval));
 		}
 		case CORBA_tk_float: {
-			return rb_float_new((double)(*(float *)retval));
+			return rb_float_new((*(float *)retval));
 		}
 		case CORBA_tk_double: {
 			return rb_float_new(*(double *)retval);
@@ -160,18 +172,17 @@ VALUE object_unmarshall(CORBA_TypeCode tc, gpointer retval) {
 		case CORBA_tk_boolean: {
 			return *(char *)retval ? Qtrue : Qfalse;
 		}
+		case CORBA_tk_octet:
 		case CORBA_tk_char: {
-			return rb_str_new(retval, 1);
-		}
-		case CORBA_tk_octet: {
-			return INT2FIX((int)*(char *)retval);
+			return INT2FIX((unsigned int)*(unsigned char *)retval);
 		}
 		case CORBA_tk_any: {
-			CORBA_any *decoded = *(CORBA_any **)retval;
-			return object_unmarshall(decoded->_type, decoded->_value);
+			//CORBA_any *decoded = *(CORBA_any **)retval;
+			CORBA_any decoded = *(CORBA_any *)retval;
+			return object_unmarshall(decoded._type, decoded._value);
 		}
 		case CORBA_tk_Principal: {
-			rb_raise(eCorbaError, "CORBA_Principal is unknown shit. Contact max@maxidoors.ru to include it's support");
+			rb_raise(eCorbaError, "CORBA_Principal is unknown type. Contact max@maxidoors.ru to include it's support");
 		}
 		case CORBA_tk_objref: {
 			return create_ruby_corba_object(*(CORBA_Object *)retval);

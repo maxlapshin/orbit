@@ -46,5 +46,8 @@ VALUE corba_object_invoke_method(int argc, VALUE *argv, VALUE self) {
 			retval = *(gpointer *)retval;
 		}
 	}
+	if(method->ret->kind == CORBA_tk_any) {
+		retval = *(gpointer *)retval;
+	}
 	return object_unmarshall(method->ret, retval);
 }
