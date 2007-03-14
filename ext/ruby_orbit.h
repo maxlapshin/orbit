@@ -16,6 +16,10 @@ extern VALUE mORBit2, cCorbaObject, eCorbaError, mOrphan, cLong, cBool;
 extern CORBA_Environment ruby_orbit2_ev;
 extern CORBA_ORB ruby_orbit2_orb;
 
+typedef struct {
+	char *data;
+	int data_size;
+} Pool;
 
 char* get_object_type_id(VALUE self);
 ORBit_IMethod* object_get_method(VALUE self, char *method_name);

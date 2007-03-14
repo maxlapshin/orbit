@@ -1,5 +1,10 @@
 #include "ruby_orbit.h"
 
+#define OUT_PARAM 1
+#define INDIRECT_PARAM 2
+
+
+
 static gpointer marshall_value(CORBA_TypeCode tc, VALUE value, char *pool, int* pool_pos, int out) {
 	while (tc->kind == CORBA_tk_alias)
 		tc = tc->subtypes[0];
@@ -24,7 +29,7 @@ static gpointer marshall_value(CORBA_TypeCode tc, VALUE value, char *pool, int* 
 			Check_Type(value, T_STRING);
 			char **val = ALLOCATE_FOR(char *);
 			*val = STR(value);
-			return  val;
+			return val;
 		}
 		case CORBA_tk_ushort:
 		case CORBA_tk_short: {
@@ -108,18 +113,18 @@ static gpointer marshall_value(CORBA_TypeCode tc, VALUE value, char *pool, int* 
 			return encoded;
 		}
 		case CORBA_tk_struct: {
-			int struct_size = tc->sub_parts*sizeof(long long);
-			char* struct_raw = ALLOCATE(struct_size);
+			char *struct_raw = pool + *pool_pos;
 			int i;
 			int offset = 0;;
 			for(i = 0; i < tc->sub_parts; i++) {
 				size_t field_size = ORBit_gather_alloc_info (tc->subtypes[i]);
 				offset = ALIGN_VALUE (offset, tc->subtypes[i]->c_align);
 				VALUE field = rb_funcall(value, rb_intern(tc->subnames[i]), 0);
-				gpointer marshalled = marshall_value(tc->subtypes[i], field, pool, pool_pos, 0);
-				memcpy(struct_raw + offset, marshalled, field_size);
+				marshall_value(tc->subtypes[i], field, pool, pool_pos, 0);
 				offset += field_size;
 			}
+			int struct_size = ORBit_gather_alloc_info(tc);
+ 			*pool_pos += struct_size - offset;
 			if(!out) return struct_raw;
 			char **struct_ptr = ALLOCATE_FOR(char *);
 			*struct_ptr = struct_raw;
@@ -136,8 +141,22 @@ static gpointer marshall_value(CORBA_TypeCode tc, VALUE value, char *pool, int* 
 			*ptr = obj;
 			return ptr;
 		}
+		case CORBA_tk_sequence: {
+			Check_Type(value, T_ARRAY);
+			CORBA_sequence_CORBA_octet *sval = ALLOCATE_FOR(CORBA_sequence_CORBA_octet);
+			CORBA_sequence_set_release(sval, CORBA_FALSE);
+			sval->_length = RARRAY(value)->len;
+			int i;
+			sval->_buffer = (void *)(pool + *pool_pos);
+			for(i = 0; i < RARRAY(value)->len; i++) {
+				marshall_value(tc->subtypes[0], RARRAY(value)->ptr[i], pool, pool_pos, 0);
+			}
+			if(!out) return sval;
+			CORBA_sequence_CORBA_octet **ptr = ALLOCATE_FOR(CORBA_sequence_CORBA_octet *);
+			*ptr = sval;
+			return ptr;
+		}
 /*		
-		case CORBA_tk_sequence:
 		case CORBA_tk_Principal:
 		case CORBA_tk_TypeCode:
 		case CORBA_tk_except:

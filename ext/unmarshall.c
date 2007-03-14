@@ -59,13 +59,13 @@ void object_unmarshall_outvalues(ORBit_IMethod* method, int argc, VALUE *argv, g
 			}
 			case CORBA_tk_ushort: {
 				if(cLong == rb_class_of(argv[i])) {
-					DATA_PTR(argv[i]) = (void *)(unsigned short)*(char *)arg;
+					DATA_PTR(argv[i]) = (void *)(long)*(unsigned short *)arg;
 				}
 				break;
 			}
 			case CORBA_tk_short: {
 				if(cLong == rb_class_of(argv[i])) {
-					DATA_PTR(argv[i]) = (void *)(short)*(char *)arg;
+					DATA_PTR(argv[i]) = (void *)(long)*(short *)arg;
 				}
 				break;
 			}
@@ -118,13 +118,22 @@ void object_unmarshall_outvalues(ORBit_IMethod* method, int argc, VALUE *argv, g
 				unmarshall_struct(argv[i], tc, arg);
 				break;
 			}
+			case CORBA_tk_sequence: {
+				Check_Type(argv[i], T_ARRAY);
+				CORBA_sequence_CORBA_octet *sval = arg;
+				int j;
+				for(j = 0; j < sval->_length; j++) {
+					gpointer val = ((gpointer *)sval->_buffer)[j];
+					rb_ary_store(argv[i], j, object_unmarshall(tc->subtypes[0], &val));
+				}
+				break;
+			}
 /*			
 			case CORBA_tk_Principal:
 			case CORBA_tk_objref:
 			case CORBA_tk_TypeCode:
 			case CORBA_tk_except:
 			case CORBA_tk_union:
-			case CORBA_tk_sequence:
 			case CORBA_tk_boolean:
 			case CORBA_tk_array:
 			case CORBA_tk_fixed:
@@ -139,7 +148,12 @@ void object_unmarshall_outvalues(ORBit_IMethod* method, int argc, VALUE *argv, g
 }
 
 VALUE object_unmarshall(CORBA_TypeCode tc, gpointer retval) {
-	if(!retval || !tc || tc->kind == CORBA_tk_void || tc->kind == CORBA_tk_null) {
+	if(!retval || !tc) {
+		return Qnil;	
+	}
+	while (tc->kind == CORBA_tk_alias)
+		tc = tc->subtypes[0];
+	if(tc->kind == CORBA_tk_void || tc->kind == CORBA_tk_null) {
 		return Qnil;	
 	}
 	switch(tc->kind) {
@@ -190,9 +204,18 @@ VALUE object_unmarshall(CORBA_TypeCode tc, gpointer retval) {
 		case CORBA_tk_string: {
 			return rb_str_new2(*(char **)retval);
 		}
-		case CORBA_tk_array:
 		case CORBA_tk_sequence: {
-			rb_raise(eCorbaError, "Sequences and arrays are not implemented yet");
+			CORBA_sequence_CORBA_octet *sval = *(CORBA_sequence_CORBA_octet **)retval;
+			VALUE value = rb_ary_new2(sval->_length);
+			int i;
+			for(i = 0; i < sval->_length; i++) {
+				if(tc->subtypes[0]->kind == CORBA_tk_string) {
+					rb_ary_push(value, rb_str_new2(((char **)sval->_buffer)[i]));
+				} else {
+					rb_ary_push(value, object_unmarshall(tc->subtypes[0], ((gpointer *)sval->_buffer)[i]));
+				}
+			}
+			return value;
 		}
 		case CORBA_tk_void:
 		case CORBA_tk_null: {
@@ -208,6 +231,7 @@ VALUE object_unmarshall(CORBA_TypeCode tc, gpointer retval) {
 			return struc;
 		}
 		/*
+		case CORBA_tk_array:
 		case CORBA_tk_TypeCode:
 		case CORBA_tk_except:
 		case CORBA_tk_union:
@@ -217,7 +241,7 @@ VALUE object_unmarshall(CORBA_TypeCode tc, gpointer retval) {
 			rb_raise(eCorbaError, "Wide characters are not supported");
 		}
 		default: {
-			rb_raise(eCorbaError, "Some really amazing stuff met in output params: %s", tc->name);
+			rb_raise(eCorbaError, "Some really amazing stuff met in output params: %s (%d)", tc->name, tc->kind);
 		}
 	}
 	return Qtrue;

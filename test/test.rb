@@ -166,4 +166,19 @@ class TestFactory < Test::Unit::TestCase
     @structServer = ORBit2::CorbaObject.from_ior(ior)
     test_struct(@structServer)
   end
+  
+  def test_sequence
+    return unless @server.is_a?("IDL:orbit/test/TestFactory:1.0")
+    @sequenceServer = @server.getSequenceServer
+    assert_equal ["opStrSeq", "opBoundedStructSeq", "opMassiveSeq", "opAnySeq"], @sequenceServer.corba_methods
+    
+    _in = ["in1", "in2"]
+    inout = ["inout1","inout2"]
+    out = []
+    retn = @sequenceServer.opStrSeq(_in, inout, out)
+    assert_equal ["retn1","retn2"], retn
+    assert_equal ["inout21","inout22"], inout
+    assert_equal ["out1","out2"], out
+    
+  end
 end
