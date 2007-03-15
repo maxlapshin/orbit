@@ -40,14 +40,16 @@ VALUE corba_object_invoke_method(int argc, VALUE *argv, VALUE self) {
 	
 	handle_exception();
 	object_unmarshall_outvalues(method, argc, argv, _args, pool_of_args);
+
 	
 	if(!(method->flags & ORBit_I_COMMON_FIXED_SIZE)) {
 		if(method->ret->kind == CORBA_tk_struct) {
 			retval = *(gpointer *)retval;
 		}
 	}
-	if(CORBA_tk_any == method->ret->kind) {
+	if(CORBA_tk_any == method->ret->kind || CORBA_tk_string == method->ret->kind) {
 		retval = *(gpointer *)retval;
 	}
+	
 	return object_unmarshall(method->ret, retval);
 }

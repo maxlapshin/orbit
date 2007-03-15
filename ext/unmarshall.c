@@ -5,7 +5,9 @@ static void unmarshall_struct(VALUE struc, CORBA_TypeCode tc, gpointer struct_ra
 	int offset = 0;;
 	for(i = 0; i < tc->sub_parts; i++) {
 		offset = ALIGN_VALUE (offset, tc->subtypes[i]->c_align);
-		VALUE field = object_unmarshall(tc->subtypes[i], struct_raw + offset);
+		gpointer c_field = struct_raw + offset;
+		//if(CORBA_tk_string == tc->subtypes[i]->kind) c_field = &c_field;
+		VALUE field = object_unmarshall(tc->subtypes[i], c_field);
 		char method_name[100];
 		snprintf(method_name, sizeof(method_name), "%s=", tc->subnames[i]);
 		rb_funcall(struc, rb_intern(method_name), 1, field);
@@ -123,8 +125,7 @@ void object_unmarshall_outvalues(ORBit_IMethod* method, int argc, VALUE *argv, g
 				CORBA_sequence_CORBA_octet *sval = arg;
 				int j;
 				for(j = 0; j < sval->_length; j++) {
-					gpointer val = ((gpointer *)sval->_buffer)[j];
-					rb_ary_store(argv[i], j, object_unmarshall(tc->subtypes[0], &val));
+					rb_ary_store(argv[i], j, object_unmarshall(tc->subtypes[0], ((gpointer *)sval->_buffer)[j]));
 				}
 				break;
 			}
@@ -162,7 +163,7 @@ VALUE object_unmarshall(CORBA_TypeCode tc, gpointer retval) {
 			return INT2NUM(*(unsigned short *)retval);
 		}
 		case CORBA_tk_long: {
-			return INT2NUM(*(long *)retval);
+			return INT2NUM((long)retval);
 		}
 		case CORBA_tk_enum:
 		case CORBA_tk_ulong: {
@@ -191,9 +192,8 @@ VALUE object_unmarshall(CORBA_TypeCode tc, gpointer retval) {
 			return INT2FIX((unsigned int)*(unsigned char *)retval);
 		}
 		case CORBA_tk_any: {
-			//CORBA_any *decoded = *(CORBA_any **)retval;
-			CORBA_any decoded = *(CORBA_any *)retval;
-			return object_unmarshall(decoded._type, decoded._value);
+			CORBA_any *decoded = (CORBA_any *)retval;
+			return object_unmarshall(decoded->_type, *(gpointer *)decoded->_value);
 		}
 		case CORBA_tk_Principal: {
 			rb_raise(eCorbaError, "CORBA_Principal is unknown type. Contact max@maxidoors.ru to include it's support");
@@ -202,6 +202,7 @@ VALUE object_unmarshall(CORBA_TypeCode tc, gpointer retval) {
 			return create_ruby_corba_object(*(CORBA_Object *)retval);
 		}
 		case CORBA_tk_string: {
+			//return rb_str_new2(retval);
 			return rb_str_new2(*(char **)retval);
 		}
 		case CORBA_tk_sequence: {
