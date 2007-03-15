@@ -2,11 +2,11 @@ require 'test/unit'
 require File.dirname(__FILE__)+"/../lib/ruby-orbit"
 
 FixedLengthStruct = Struct.new :a
-VariableLengthStruct = FixedLengthStruct
-CompoundStruct = FixedLengthStruct
+VariableLengthStruct = Struct.new :a
+CompoundStruct = Struct.new :a
 AlignHoleInnerStruct = Struct.new :a, :b
-AlignHoleStruct = AlignHoleInnerStruct
-StructAny = AlignHoleInnerStruct
+AlignHoleStruct = Struct.new :a, :b
+StructAny = Struct.new :a, :b
 ObjectStruct = Struct.new :serv
 
 
@@ -179,6 +179,14 @@ class TestFactory < Test::Unit::TestCase
     assert_equal ["retn1","retn2"], retn
     assert_equal ["inout21","inout22"], inout
     assert_equal ["out1","out2"], out
+    
+    _in = [CompoundStruct.new(VariableLengthStruct.new("in1")), CompoundStruct.new(VariableLengthStruct.new("in2"))]
+    inout = [CompoundStruct.new(VariableLengthStruct.new("inout1")), CompoundStruct.new(VariableLengthStruct.new("inout2"))]
+    out = []
+    retn = @sequenceServer.opBoundedStructSeq(_in, inout, out)
+    assert_equal [CompoundStruct.new(VariableLengthStruct.new("retn1")), CompoundStruct.new(VariableLengthStruct.new("retn2"))], retn
+    assert_equal [CompoundStruct.new(VariableLengthStruct.new("inout21")), CompoundStruct.new(VariableLengthStruct.new("inout22"))], inout
+    assert_equal [CompoundStruct.new(VariableLengthStruct.new("out1")), CompoundStruct.new(VariableLengthStruct.new("out2"))], out
     
   end
 end

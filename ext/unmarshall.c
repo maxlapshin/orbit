@@ -1,6 +1,6 @@
 #include "ruby_orbit.h"
 
-static void unmarshall_struct(VALUE struc, CORBA_TypeCode tc, gpointer struct_raw) {
+static VALUE unmarshall_struct(VALUE struc, CORBA_TypeCode tc, gpointer struct_raw) {
 	int i;
 	int offset = 0;;
 	for(i = 0; i < tc->sub_parts; i++) {
@@ -13,6 +13,16 @@ static void unmarshall_struct(VALUE struc, CORBA_TypeCode tc, gpointer struct_ra
 		rb_funcall(struc, rb_intern(method_name), 1, field);
 		offset += ORBit_gather_alloc_info (tc->subtypes[i]);;
 	}
+	return struc;
+}
+
+static VALUE unmarshall_sequence(VALUE seq, CORBA_TypeCode tc, CORBA_sequence_CORBA_octet *sval) {
+	int i;
+	for(i = 0; i < sval->_length; i++) {
+		VALUE v = object_unmarshall(tc->subtypes[0], sval->_buffer + i*sizeof(gpointer));
+		rb_ary_store(seq, i, v);
+	}
+	return seq;
 }
 
 void object_unmarshall_outvalues(ORBit_IMethod* method, int argc, VALUE *argv, gpointer *args, char *pool) {
@@ -122,11 +132,7 @@ void object_unmarshall_outvalues(ORBit_IMethod* method, int argc, VALUE *argv, g
 			}
 			case CORBA_tk_sequence: {
 				Check_Type(argv[i], T_ARRAY);
-				CORBA_sequence_CORBA_octet *sval = arg;
-				int j;
-				for(j = 0; j < sval->_length; j++) {
-					rb_ary_store(argv[i], j, object_unmarshall(tc->subtypes[0], ((gpointer *)sval->_buffer)[j]));
-				}
+				unmarshall_sequence(argv[i], tc, arg);
 				break;
 			}
 /*			
@@ -163,7 +169,7 @@ VALUE object_unmarshall(CORBA_TypeCode tc, gpointer retval) {
 			return INT2NUM(*(unsigned short *)retval);
 		}
 		case CORBA_tk_long: {
-			return INT2NUM((long)retval);
+			return INT2NUM(*(long *)retval);
 		}
 		case CORBA_tk_enum:
 		case CORBA_tk_ulong: {
@@ -193,7 +199,7 @@ VALUE object_unmarshall(CORBA_TypeCode tc, gpointer retval) {
 		}
 		case CORBA_tk_any: {
 			CORBA_any *decoded = (CORBA_any *)retval;
-			return object_unmarshall(decoded->_type, *(gpointer *)decoded->_value);
+			return object_unmarshall(decoded->_type, decoded->_value);
 		}
 		case CORBA_tk_Principal: {
 			rb_raise(eCorbaError, "CORBA_Principal is unknown type. Contact max@maxidoors.ru to include it's support");
@@ -202,21 +208,12 @@ VALUE object_unmarshall(CORBA_TypeCode tc, gpointer retval) {
 			return create_ruby_corba_object(*(CORBA_Object *)retval);
 		}
 		case CORBA_tk_string: {
-			//return rb_str_new2(retval);
-			return rb_str_new2(*(char **)retval);
+			return *(char **)retval ? rb_str_new2(*(char **)retval) : Qnil;
 		}
 		case CORBA_tk_sequence: {
 			CORBA_sequence_CORBA_octet *sval = *(CORBA_sequence_CORBA_octet **)retval;
 			VALUE value = rb_ary_new2(sval->_length);
-			int i;
-			for(i = 0; i < sval->_length; i++) {
-				if(tc->subtypes[0]->kind == CORBA_tk_string) {
-					rb_ary_push(value, rb_str_new2(((char **)sval->_buffer)[i]));
-				} else {
-					rb_ary_push(value, object_unmarshall(tc->subtypes[0], ((gpointer *)sval->_buffer)[i]));
-				}
-			}
-			return value;
+			return unmarshall_sequence(value, tc, sval);
 		}
 		case CORBA_tk_void:
 		case CORBA_tk_null: {
@@ -228,8 +225,7 @@ VALUE object_unmarshall(CORBA_TypeCode tc, gpointer retval) {
 		case CORBA_tk_struct: {
 			VALUE klass = rb_funcall(cCorbaObject, rb_intern("lookup!"), 1, rb_str_new2(tc->name));
 			VALUE struc = rb_funcall(klass, rb_intern("new"), 0);
-			unmarshall_struct(struc, tc, retval);
-			return struc;
+			return unmarshall_struct(struc, tc, retval);
 		}
 		/*
 		case CORBA_tk_array:
