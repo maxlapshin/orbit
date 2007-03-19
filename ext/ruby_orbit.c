@@ -45,6 +45,9 @@ static VALUE long_equal(VALUE self, VALUE l) {
 		long long ll = rb_big2ll(l);
 		return ll == (long long)(long)DATA_PTR(self) ? Qtrue : Qfalse;
 	}
+	if(T_FLOAT == TYPE(l)) {
+		return (long)DATA_PTR(self) == (long)RFLOAT(l)->value ? Qtrue : Qfalse;
+	}
 	if(cLong == rb_class_of(l)) {
 		return DATA_PTR(self) == DATA_PTR(l) ? Qtrue : Qfalse;
 	}

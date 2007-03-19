@@ -177,6 +177,7 @@ VALUE object_unmarshall(CORBA_TypeCode tc, gpointer retval) {
 	if(!retval || !tc) {
 		return Qnil;	
 	}
+	CORBA_TypeCode orig = tc;
 	while (CORBA_tk_alias == tc->kind)
 		tc = tc->subtypes[0];
 	if(CORBA_tk_void == tc->kind || CORBA_tk_null == tc->kind) {
@@ -218,7 +219,6 @@ VALUE object_unmarshall(CORBA_TypeCode tc, gpointer retval) {
 		}
 		case CORBA_tk_any: {
 			CORBA_any *decoded = (CORBA_any *)retval;
-			printf("Unmarshalling any: %s\n", decoded->_type->name);
 			return object_unmarshall(decoded->_type, decoded->_value);
 		}
 		case CORBA_tk_Principal: {
@@ -232,6 +232,8 @@ VALUE object_unmarshall(CORBA_TypeCode tc, gpointer retval) {
 		}
 		case CORBA_tk_sequence: {
 			CORBA_sequence_CORBA_octet *sval = *(CORBA_sequence_CORBA_octet **)retval;
+			//CORBA_sequence_CORBA_octet *sval = retval;
+			//printf("Hi: %d (%s)\n", sval->_length, orig->name);
 			VALUE value = rb_ary_new2(sval->_length);
 			return unmarshall_sequence(value, tc, sval);
 		}

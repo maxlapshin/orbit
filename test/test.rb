@@ -256,19 +256,13 @@ class TestFactory < Test::Unit::TestCase
     assert_equal SEQ_STRING_OUT, out
     assert_equal SEQ_STRING_RETN, retn
 
-    _in = (0..3).map{|i| AlignHoleStruct.new(AlignHoleInnerStruct.new(ORBit2::Long.new(SEQ_OCTET_IN[i]), ORBit2::Long.new(SEQ_OCTET_IN[i])), ORBit2::Long.new(SEQ_OCTET_IN[i])) }
-    inout = (0..3).map{|i| AlignHoleStruct.new(AlignHoleInnerStruct.new(ORBit2::Long.new(SEQ_OCTET_INOUT_IN[i]), ORBit2::Long.new(SEQ_OCTET_INOUT_IN[i])), ORBit2::Long.new(SEQ_OCTET_INOUT_IN[i])) }
+    _in = (0..3).map{|i| AlignHoleStruct.new(AlignHoleInnerStruct.new(SEQ_OCTET_IN[i], SEQ_OCTET_IN[i]), SEQ_OCTET_IN[i]) }
+    inout = (0..3).map{|i| AlignHoleStruct.new(AlignHoleInnerStruct.new(SEQ_OCTET_INOUT_IN[i], SEQ_OCTET_INOUT_IN[i]), SEQ_OCTET_INOUT_IN[i]) }
     out = []
     retn = @arrayServer.opAlignHoleStructArray(_in, inout, out)
-    assert_equal (0..3).map{|i| AlignHoleStruct.new(AlignHoleInnerStruct.new(ORBit2::Long.new(SEQ_OCTET_INOUT_IN[i]), ORBit2::Long.new(SEQ_OCTET_INOUT_IN[i])), ORBit2::Long.new(SEQ_OCTET_INOUT_IN[i])) }, inout
-    assert_equal (0..3).map{|i| AlignHoleStruct.new(AlignHoleInnerStruct.new(ORBit2::Long.new(SEQ_OCTET_OUT[i]), ORBit2::Long.new(SEQ_OCTET_OUT[i])), ORBit2::Long.new(SEQ_OCTET_OUT[i])) }, out
-    assert_equal (0..3).map{|i| AlignHoleStruct.new(AlignHoleInnerStruct.new(ORBit2::Long.new(SEQ_OCTET_RETN[i]), ORBit2::Long.new(SEQ_OCTET_RETN[i])), ORBit2::Long.new(SEQ_OCTET_RETN[i])) }, retn
+    assert_equal (0..3).map{|i| AlignHoleStruct.new(AlignHoleInnerStruct.new(SEQ_OCTET_INOUT_OUT[i], SEQ_OCTET_INOUT_OUT[i]), SEQ_OCTET_INOUT_OUT[i]) }, inout
+    assert_equal (0..3).map{|i| AlignHoleStruct.new(AlignHoleInnerStruct.new(SEQ_OCTET_OUT[i], SEQ_OCTET_OUT[i]), SEQ_OCTET_OUT[i]) }, out
+    assert_equal (0..3).map{|i| AlignHoleStruct.new(AlignHoleInnerStruct.new(SEQ_OCTET_RETN[i], SEQ_OCTET_RETN[i]), SEQ_OCTET_RETN[i]) }, retn
   end
 
-  def test_context
-    return unless @server.is_a?("IDL:orbit/test/TestFactory:1.0")
-    assert_equal ["opWithContext"], @contextServer.corba_methods
-    
-    # don't know, what is context
-  end
 end
