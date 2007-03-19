@@ -18,11 +18,25 @@ static VALUE unmarshall_struct(VALUE struc, CORBA_TypeCode tc, gpointer struct_r
 
 static VALUE unmarshall_sequence(VALUE seq, CORBA_TypeCode tc, CORBA_sequence_CORBA_octet *sval) {
 	int i;
+	CORBA_TypeCode element_type = tc->subtypes[0];
+	size_t element_size = ORBit_gather_alloc_info(element_type);
 	for(i = 0; i < sval->_length; i++) {
-		VALUE v = object_unmarshall(tc->subtypes[0], sval->_buffer + i*sizeof(gpointer));
+		VALUE v = object_unmarshall(element_type, sval->_buffer + i*element_size);
 		rb_ary_store(seq, i, v);
 	}
 	return seq;
+}
+
+static VALUE unmarshall_array(VALUE ary, CORBA_TypeCode tc, gpointer ptr) {
+	Check_Type(ary, T_ARRAY);
+	int i;
+	CORBA_TypeCode element_type = tc->subtypes[0];
+	size_t element_size = ORBit_gather_alloc_info(element_type);
+	for(i = 0; i < tc->length; i++) {
+		VALUE v = object_unmarshall(element_type, ptr + i*element_size);
+		rb_ary_store(ary, i, v);
+	}
+	return ary;
 }
 
 void object_unmarshall_outvalues(ORBit_IMethod* method, int argc, VALUE *argv, gpointer *args, char *pool) {
@@ -135,6 +149,11 @@ void object_unmarshall_outvalues(ORBit_IMethod* method, int argc, VALUE *argv, g
 				unmarshall_sequence(argv[i], tc, arg);
 				break;
 			}
+			case CORBA_tk_array: {
+				Check_Type(argv[i], T_ARRAY);
+				unmarshall_array(argv[i], tc, arg);
+				break;
+			}
 /*			
 			case CORBA_tk_Principal:
 			case CORBA_tk_objref:
@@ -158,9 +177,9 @@ VALUE object_unmarshall(CORBA_TypeCode tc, gpointer retval) {
 	if(!retval || !tc) {
 		return Qnil;	
 	}
-	while (tc->kind == CORBA_tk_alias)
+	while (CORBA_tk_alias == tc->kind)
 		tc = tc->subtypes[0];
-	if(tc->kind == CORBA_tk_void || tc->kind == CORBA_tk_null) {
+	if(CORBA_tk_void == tc->kind || CORBA_tk_null == tc->kind) {
 		return Qnil;	
 	}
 	switch(tc->kind) {
@@ -199,6 +218,7 @@ VALUE object_unmarshall(CORBA_TypeCode tc, gpointer retval) {
 		}
 		case CORBA_tk_any: {
 			CORBA_any *decoded = (CORBA_any *)retval;
+			printf("Unmarshalling any: %s\n", decoded->_type->name);
 			return object_unmarshall(decoded->_type, decoded->_value);
 		}
 		case CORBA_tk_Principal: {
@@ -227,8 +247,11 @@ VALUE object_unmarshall(CORBA_TypeCode tc, gpointer retval) {
 			VALUE struc = rb_funcall(klass, rb_intern("new"), 0);
 			return unmarshall_struct(struc, tc, retval);
 		}
+		case CORBA_tk_array: {
+			VALUE ary = rb_ary_new2(tc->length);
+			return unmarshall_array(ary, tc, *(gpointer *)retval);
+		}
 		/*
-		case CORBA_tk_array:
 		case CORBA_tk_TypeCode:
 		case CORBA_tk_except:
 		case CORBA_tk_union:

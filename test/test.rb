@@ -9,6 +9,24 @@ AlignHoleStruct = Struct.new :a, :b
 StructAny = Struct.new :a, :b
 ObjectStruct = Struct.new :serv
 
+LONG_IN = ORBit2::Long.new(305419896) #0x12345678
+LONG_INOUT_IN = ORBit2::Long.new(878082066) #0x34567812
+LONG_INOUT_OUT = ORBit2::Long.new(1450709556) #0x56781234
+LONG_OUT = ORBit2::Long.new(2014458966) #0x78123456
+LONG_RETN = ORBit2::Long.new(-1430532899) #0xAABBCCDD
+
+SEQ_STRING_IN = [ "in1","in2","in3","in4" ]
+SEQ_STRING_OUT = ["out1","out2","out3","out4"]
+SEQ_STRING_INOUT_IN = ["inout1","inout2","inout3","inout4"]
+SEQ_STRING_INOUT_OUT = ["inout21","inout22","inout23","inout24"] 
+SEQ_STRING_RETN = ["retn1","retn2","retn3","retn4"]
+
+SEQ_OCTET_IN = [1, 3, 5, 7]
+SEQ_OCTET_INOUT_IN = [1, 15, 8, 0]
+SEQ_OCTET_INOUT_OUT = [73, 128, 173, 15]
+SEQ_OCTET_OUT = [2, 7, 9, 255]
+SEQ_OCTET_RETN = [1, 3, 5, 7]
+
 
 module Orbit
   module Test
@@ -52,7 +70,7 @@ class TestFactory < Test::Unit::TestCase
     assert_equal "Retn String", @basicServer.foo
     @basicServer.foo = "In string"
     
-    assert_equal -1430532899, @basicServer.bah
+    assert_equal LONG_RETN, @basicServer.bah
 
     _in = "In string"
     inout = "Inout in string";
@@ -61,12 +79,12 @@ class TestFactory < Test::Unit::TestCase
     assert_equal "Inout out string", inout
     assert_equal "Out string", out
     
-    _in = 0x12345678
-    inout = ORBit2::Long.new 0x34567812
-    out = ORBit2::Long.new 0  
-    assert_equal -1430532899, @basicServer.opLong(_in, inout, out)
-    assert_equal 1450709556, inout.to_i
-    assert_equal 2014458966, out.to_i
+    _in = ORBit2::Long.new LONG_IN
+    inout = ORBit2::Long.new LONG_INOUT_IN
+    out = ORBit2::Long.new 0
+    assert_equal LONG_RETN, @basicServer.opLong(_in, inout, out)
+    assert_equal LONG_INOUT_OUT, inout.to_i
+    assert_equal LONG_OUT, out.to_i
 
     _in = 127.13534
     inout = 124.89432
@@ -188,5 +206,69 @@ class TestFactory < Test::Unit::TestCase
     assert_equal [CompoundStruct.new(VariableLengthStruct.new("inout21")), CompoundStruct.new(VariableLengthStruct.new("inout22"))], inout
     assert_equal [CompoundStruct.new(VariableLengthStruct.new("out1")), CompoundStruct.new(VariableLengthStruct.new("out2"))], out
     
+    retn = @sequenceServer.opMassiveSeq
+    assert_equal 400000, retn.length
+
+    retn = @sequenceServer.opAnySeq
+    assert_equal 1000, retn.length
+  end
+  
+  def test_union
+    return unless @server.is_a?("IDL:orbit/test/TestFactory:1.0")
+    @unionServer = @server.getUnionServer
+    assert_equal ["opFixed", "opVariable", "opMisc", "opFixedLengthUnionArray"], @unionServer.corba_methods
+  end
+  
+  def test_array
+    return unless @server.is_a?("IDL:orbit/test/TestFactory:1.0")
+    @arrayServer = @server.getArrayServer
+    assert_equal ["opLongArray", "opOctetArray", "opFixedLengthStructArray", "opStrArray", "opAlignHoleStructArray"], @arrayServer.corba_methods
+    
+    _in = [LONG_IN, LONG_INOUT_IN, 15, 7]
+    inout = [LONG_INOUT_OUT, LONG_OUT, 7, 15]
+    out = []
+    retn = @arrayServer.opLongArray(_in, inout, out)
+    assert_equal [LONG_OUT, LONG_RETN,8,9], inout
+    assert_equal [LONG_INOUT_IN, LONG_INOUT_OUT,15,7], out
+    assert_equal [LONG_RETN, LONG_IN,2,3], retn
+    
+    _in = [1, 3, 5, 7]
+    inout = [1, 15, 8, 0]
+    out = []
+    retn = @arrayServer.opOctetArray(_in, inout, out)
+    assert_equal [73, 128, 173, 15], inout
+    assert_equal [2, 7, 9, 255], out
+    assert_equal [1, 3, 5, 7], retn
+
+    _in = [1, 3, 5, 7].map{|a| FixedLengthStruct.new(a)}
+    inout = [1, 15, 8, 0].map{|a| FixedLengthStruct.new(a)}
+    out = []
+    retn = @arrayServer.opFixedLengthStructArray(_in, inout, out)
+    assert_equal [73, 128, 173, 15].map{|a| FixedLengthStruct.new(a)}, inout
+    assert_equal [2, 7, 9, 255].map{|a| FixedLengthStruct.new(a)}, out
+    assert_equal [1, 3, 5, 7].map{|a| FixedLengthStruct.new(a)}, retn
+    
+    _in = SEQ_STRING_IN
+    inout = SEQ_STRING_INOUT_IN.map{|a| a.clone}
+    out = []
+    retn = @arrayServer.opStrArray(_in, inout, out)
+    assert_equal SEQ_STRING_INOUT_OUT, inout
+    assert_equal SEQ_STRING_OUT, out
+    assert_equal SEQ_STRING_RETN, retn
+
+    _in = (0..3).map{|i| AlignHoleStruct.new(AlignHoleInnerStruct.new(ORBit2::Long.new(SEQ_OCTET_IN[i]), ORBit2::Long.new(SEQ_OCTET_IN[i])), ORBit2::Long.new(SEQ_OCTET_IN[i])) }
+    inout = (0..3).map{|i| AlignHoleStruct.new(AlignHoleInnerStruct.new(ORBit2::Long.new(SEQ_OCTET_INOUT_IN[i]), ORBit2::Long.new(SEQ_OCTET_INOUT_IN[i])), ORBit2::Long.new(SEQ_OCTET_INOUT_IN[i])) }
+    out = []
+    retn = @arrayServer.opAlignHoleStructArray(_in, inout, out)
+    assert_equal (0..3).map{|i| AlignHoleStruct.new(AlignHoleInnerStruct.new(ORBit2::Long.new(SEQ_OCTET_INOUT_IN[i]), ORBit2::Long.new(SEQ_OCTET_INOUT_IN[i])), ORBit2::Long.new(SEQ_OCTET_INOUT_IN[i])) }, inout
+    assert_equal (0..3).map{|i| AlignHoleStruct.new(AlignHoleInnerStruct.new(ORBit2::Long.new(SEQ_OCTET_OUT[i]), ORBit2::Long.new(SEQ_OCTET_OUT[i])), ORBit2::Long.new(SEQ_OCTET_OUT[i])) }, out
+    assert_equal (0..3).map{|i| AlignHoleStruct.new(AlignHoleInnerStruct.new(ORBit2::Long.new(SEQ_OCTET_RETN[i]), ORBit2::Long.new(SEQ_OCTET_RETN[i])), ORBit2::Long.new(SEQ_OCTET_RETN[i])) }, retn
+  end
+
+  def test_context
+    return unless @server.is_a?("IDL:orbit/test/TestFactory:1.0")
+    assert_equal ["opWithContext"], @contextServer.corba_methods
+    
+    # don't know, what is context
   end
 end

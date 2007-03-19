@@ -21,8 +21,16 @@ static VALUE long_allocate(VALUE klass) {
 	return Data_Wrap_Struct(klass, 0, long_free, 0);
 }
 static VALUE long_initialize(VALUE self, VALUE i) {
-	Check_Type(i, T_FIXNUM);
-	DATA_PTR(self) = (void *)NUM2INT(i);
+	if(T_FIXNUM == TYPE(i)) {
+		DATA_PTR(self) = (void *)NUM2INT(i);
+	} else if(T_BIGNUM == TYPE(i)) {
+		long long ll = rb_big2ll(i);
+		DATA_PTR(self) = (long)ll;
+	} else if(cLong == rb_class_of(i)) {
+		DATA_PTR(self) = DATA_PTR(i);
+	} else {
+		rb_raise(rb_eTypeError, "wrong type argument %s (expected Fixnum, Bignum or ORBit2::Long)", rb_obj_classname(i));
+	}
 	return self;
 }
 static VALUE long_to_i(VALUE self) {

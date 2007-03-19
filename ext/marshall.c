@@ -18,8 +18,10 @@ static gpointer marshall_value(CORBA_TypeCode tc, VALUE value, char *pool, int* 
 		case CORBA_tk_char:
 		case CORBA_tk_octet: {
 			char *val = ALLOCATE_FOR(char);
-			if(T_FIXNUM == TYPE(value) || cLong == rb_class_of(value)) {
+			if(T_FIXNUM == TYPE(value)) {
 				*val = (char)NUM2INT(value);
+			} else if (cLong == rb_class_of(value)) {
+				*val = (char)DATA_PTR(value);
 			} else {
 				rb_raise(rb_eTypeError, "wrong type argument %s (expected Fixnum or ORBit2::Long)", rb_obj_classname(value));
 			}
@@ -28,7 +30,7 @@ static gpointer marshall_value(CORBA_TypeCode tc, VALUE value, char *pool, int* 
 		case CORBA_tk_string: {
 			Check_Type(value, T_STRING);
 			char **val = ALLOCATE_FOR(char *);
-			*val = STR(value);
+			*val = CORBA_string_dup(STR(value));
 			return val;
 		}
 		case CORBA_tk_ushort:
@@ -67,9 +69,16 @@ static gpointer marshall_value(CORBA_TypeCode tc, VALUE value, char *pool, int* 
 			rb_raise(eCorbaError, "Long Long unsupported");
 		}
 		case CORBA_tk_double: {
-			Check_Type(value, T_FLOAT);
 			double *val = ALLOCATE_FOR(double);
-			*val = RFLOAT(value)->value;
+			if(T_FLOAT == TYPE(value)) {
+				*val = RFLOAT(value)->value;
+			} else if(T_FIXNUM == TYPE(value)) {
+				*val = (double)NUM2INT(value);
+			} else if(cLong = rb_class_of(value)) {
+				*val = (double)(long)DATA_PTR(value);
+			} else {
+				rb_raise(rb_eTypeError, "wrong type argument %s (expected Float, Fixnum or ORBit2::Long)", rb_obj_classname(value));
+			}
 			if(!out) return val;
 			double **val_ptr = ALLOCATE_FOR(double *);
 			*val_ptr = val;
@@ -156,13 +165,26 @@ static gpointer marshall_value(CORBA_TypeCode tc, VALUE value, char *pool, int* 
 			*ptr = sval;
 			return ptr;
 		}
+		case CORBA_tk_array: {
+			Check_Type(value, T_ARRAY);
+			gpointer ptr = pool + *pool_pos;
+			CORBA_TypeCode subtype = tc->subtypes[0];
+			int i;
+			for(i = 0; i < tc->length && i < RARRAY(value)->len; i++) {
+				marshall_value(subtype, RARRAY(value)->ptr[i], pool, pool_pos, 0);
+			}
+			ALLOCATE((tc->length - i)*ORBit_gather_alloc_info(subtype));
+			if(!out) return ptr;
+			gpointer *ret = ALLOCATE_FOR(gpointer);
+			*ret = ptr;
+			return ret;
+		}
 /*		
 		case CORBA_tk_Principal:
 		case CORBA_tk_TypeCode:
 		case CORBA_tk_except:
 		case CORBA_tk_union:
 		case CORBA_tk_boolean:
-		case CORBA_tk_array:
 		case CORBA_tk_fixed:
 	*/
 		default: {

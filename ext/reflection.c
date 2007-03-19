@@ -32,6 +32,9 @@ static void describe_type(VALUE description, CORBA_TypeCode tc) {
 	if(!tc) {
 		return;
 	}
+	while (tc->kind == CORBA_tk_alias)
+		tc = tc->subtypes [0];
+	
 	if(tc->kind == CORBA_tk_struct) {
 		int j;
 		rb_str_cat2(description, tc->name);
@@ -47,6 +50,25 @@ static void describe_type(VALUE description, CORBA_TypeCode tc) {
 	} else if (tc->kind == CORBA_tk_sequence) {
 		describe_type(description, tc->subtypes[0]);
 		rb_str_cat2(description, "[] ");
+	} else if(tc->kind == CORBA_tk_array) {
+		describe_type(description, tc->subtypes[0]);
+		char buf[40];
+		snprintf(buf, sizeof(buf), "[%d] ", tc->length);
+		rb_str_cat2(description, buf);
+	} else if(tc->kind == CORBA_tk_union) {
+		rb_str_cat2(description, tc->name);
+		rb_str_cat2(description, "(");
+		describe_type(description, tc->discriminator);
+		rb_str_cat2(description, ": ");
+		int j;
+		for(j = 0; j < tc->sub_parts; j++) {
+			if(j > 0) {
+				rb_str_cat2(description, ", ");
+			}
+			describe_type(description, tc->subtypes[j]);
+			rb_str_cat2(description, tc->subnames[j]);
+		}
+		rb_str_cat2(description, ") ");
 	} else if(tc->name) {
 		rb_str_cat2(description, tc->name);
 		rb_str_cat2(description, " ");
