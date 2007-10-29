@@ -38,5 +38,14 @@ module ORBit2
     def inspect
       to_i.inspect
     end
+    
+    def class
+      Bignum
+    end
+    
+    def <=>(number)
+      to_i <=> number
+    end
+    include Enumerable
   end
 end

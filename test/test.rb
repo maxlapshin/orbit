@@ -265,4 +265,6 @@ class TestFactory < Test::Unit::TestCase
     assert_equal (0..3).map{|i| AlignHoleStruct.new(AlignHoleInnerStruct.new(SEQ_OCTET_RETN[i], SEQ_OCTET_RETN[i]), SEQ_OCTET_RETN[i]) }, retn
   end
 
+  def test_exception
+  end
 end
